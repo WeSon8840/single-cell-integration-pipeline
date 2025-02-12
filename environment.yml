@@ -1,0 +1,21 @@
+name: single_cell_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - jupyter
+  - pandas
+  - numpy
+  - ipykernel
+  - notebook
+  - matplotlib
+  - pulp
+  - scipy
+  - seaborn
+  - scikit-learn
+  - scanpy
+  - anndata
+  - leidenalg
+  - plotly
+  - pooch

@@ -33,13 +33,15 @@ Goal for quality control is to remove low-quality cells from the dataset. When a
 
 #### 2.1. Identifying some important genes
 
-For our dataset, the imporatant genes is Mitochondrial genes, starting with `MT-`.
+During single-cell RNA-seq (scRNA-seq) quality control (QC), we usually check the expression ratio of mitochondrial genes (MT-genes).
+  - Mitochondrial genes are primarily involved in cellular energy metabolism and should only account for a small portion of transcripts. If a cell has an abnormally high proportion of MT-gene expression, it often indicates that the cell is under stress, undergoing apoptosis, or has lysed.
+  - When a cell dies, its membrane may rupture, leading to RNA leakage. However, mitochondrial RNA is more stable and less prone to degradation, so scRNA-seq results for dead cells often show an abnormally high proportion of MT-gene expression.
 
 ```bash
 adata.var["mt"] = adata.var_names.str.startswith("MT-")
 ```
 
-It is necessary because when cells die or respond to stress, the proportion of mitochondrial gene expression increases.
+When cells die or respond to stress, the proportion of mitochondrial gene expression increases.
 
 > Usually we will also check Ribosomal genes (ribo) and Hemoglobin genes (hb). It is not necessay for this dataset.
 
@@ -54,7 +56,7 @@ sc.pp.calculate_qc_metrics(
 
 Some important metrics:
 
-- `n_genes_by_counts`: the number of genes expressed in the a cell.
+- `n_genes_by_counts`: the number of genes expressed in a cell.
 - `total_counts`: the total number of counts (UMI) for a cell.
 - `pct_counts_mt`: the percentage of counts in mitochondrial genes.
 
@@ -65,30 +67,28 @@ Use `violin plots` to visualize the data distribution.
 ```bash
 sc.pl.violin(
     adata,
-    ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
-    jitter=0.4, multi_panel=True,
+    ["total_counts", "n_genes_by_counts", "pct_counts_mt"],
+    jitter=0.4,
+    multi_panel=True,
 )
 ```
 
-Once we got the plots, we can determine appropriate filtering thresholds.
+![alt text](image-13.png)
 
-![alt text](image-1.png)
 
-- Left Plot (`n_genes_by_counts`):
-  - Cells with low gene counts may be of poor quality, and extremely high values may indicate doublets.
-  - Usually filtering: `n_genes_by_counts < 200` and `n_genes_by_counts > 3000-4000`.
-- Middle Plot (`total_counts`):
-  - Low total UMI counts may indicate low-quality cells, while very high counts suggest doublets.
-  - Usually filtering: `total_counts < 500` and `total_counts > 10000-15000`.
-- Right Plot (`pct_counts_mt`):
-  - High mitochondrial gene fractions (>20%) may indicate dying cells.
-  - Usually filtering: `pct_counts_mt > 20%`.
+#### 2.3.1 `total_counts` distribution
 
-#### 2.4 Filter Low-Quality Cells
+![alt text](image-14.png)
 
-Remove the low-quality cells and potential doublets.
+#### 2.3.2 `n_genes_by_counts` distribution
 
-#### 2.5 Detection and Remove Doublet
+![alt text](image-15.png)
+
+#### 2.3.3 Scatter Plot and distribution for `pct_counts_mt`
+
+![alt text](image-16.png)
+
+#### 2.4 Detection and Remove Doublet
 
 Doublets are defined as two cells that are sequenced under the same cellular barcode, for example, if they were captured in the same droplet. 
 
@@ -103,23 +103,40 @@ In `scrublet` doublet detection, `doublet_score` represents the probability that
 
 If `doublet_score > 0.2`, the cell is likely a doublet.
 
+Once we got thoes plots and doublet_score, we can determine appropriate filtering thresholds.
+
+- `total_counts`:
+  - Low total UMI counts may indicate low-quality cells, while very high counts suggest doublets.
+  - Filtering: `total_counts < 650` and `total_counts > 5500`.
+- n_genes_by_counts`:
+  - Cells with low gene counts may be of poor quality, and extremely high values may indicate doublets.
+  - Filtering: `n_genes_by_counts < 310` and `n_genes_by_counts > 1700`.
+- `pct_counts_mt`:
+  - High mitochondrial gene fractions may indicate dying cells.
+  - Filtering: `pct_counts_mt > 7%`.
+- `doublet`:
+  - Filtering: `doublet_score < 0.2`.
+
 ### 3. Normalization and Log Transformation
 
 #### Normalization
 - Adjusts gene expression levels (counts) across cells to make them comparable.
 - It can avoid technical noise and ensures consistent sequencing depth across different cells.
+- I using the defalut scanpy method `noralize_total`, which is total counts Scaling.
+  - Normalize the total UMI counts for each cell to acommon target value (default target_sum = 1e4).
 - Does not change the data distribution
 
 #### Log Transformation (Log1p): 
 - Reduce the influence of highly expressed genes, making the data distribution closer to a normal distribution, which is beneficial for PCA, UMAP, and clustering analysis.
 - Does not change the relative expression relationships between different cells but compresses the dynamic range of the data.
+- log1p is log(1+ $X_normalized$)
 
 ```bash
-sc.pp.normalize_total(adata, target_sum=1e4)
-sc.pp.log1p(adata)
+sc.pp.normalize_total(adata_filtered, target_sum=1e4)
+sc.pp.log1p(adata_filtered)
 ```
 
-![alt text](image-4.png)
+![alt text](image-17.png)
 
 - Left plot (raw count):
   - Right-skewed Distribution
@@ -143,11 +160,11 @@ Reduce the dimensionality of the dataset and only include the most informative g
 sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=2000)
 ```
 
-![alt text](image.png)
+![alt text](image-4.png)
 
-- Low mean expressions, high variances. --> NOT HVGs
-- High mean expressions, low variances. --> NOT HVGs
-- HVGs: median mean expressions, high variances after normalization.
+- Low mean expressions, low variances. --> NOT HVGs, usually is noise.
+- High mean expressions, low variances. --> NOT HVGs, housekeeping genes, stable expression.
+- HVGs: median/high mean expressions, high variances after normalization.
 
 ### 5. Dimensionality Reduction
 
@@ -164,8 +181,8 @@ PCA creates a new set of uncorrelated variables, so called principal components 
 Usually, 10-50 PCs are selected since the first few PCs explain most of the variance.
 
 ```bash
-sc.tl.pca(adata) # defalut to 50 dimension 
-sc.pl.pca_variance_ratio(adata, log=True)
+sc.tl.pca(adata_filtered) # defalut to 50 dimension 
+sc.pl.pca_variance_ratio(adata_filtered, log=True)
 ```
 
 ![alt text](image-2.png)
@@ -179,15 +196,15 @@ sc.pl.pca_variance_ratio(adata, log=True)
 
 Nonlinear dimensionality reduction for visualization.
 
-We can compute `Neighborhood Graph` using UMAP.
+We can compute `Neighborhood` and visulize using UMAP.
 
 ```bash
-sc.pp.neighbors(adata, n_pcs=15)
-sc.tl.umap(adata)
-sc.pl.umap(adata, color="total_counts", size=7)
+sc.pp.neighbors(adata_filtered, n_pcs=15)
+sc.tl.umap(adata_filtered)
+sc.pl.umap(adata_filtered, color="total_counts", size=7)
 ```
 
-![alt text](image-5.png)
+![alt text](image.png)
 
 - The X-axis (UMAP1) and Y-axis (UMAP2) represent the two dimensions of the UMAP projection (a 2D representation of data).
 - Color bar: represents the total_counts. i.e., the total number of RNA molecules detected in each cell.
@@ -205,7 +222,7 @@ sc.pl.umap(adata, color="total_counts", size=7)
 1. The `Leiden algorithm` is commonly used for clustering single-cell data.
 
 ```bash
-sc.tl.leiden(adata, flavor="igraph", 
+sc.tl.leiden(adata_filtered, flavor="igraph",
              n_iterations=2, resolution=0.5)
 ```
 
@@ -215,17 +232,17 @@ sc.tl.leiden(adata, flavor="igraph",
 2. Visualizing clusters with UMAP.
 
 ```bash
-sc.pl.umap(adata, color=["leiden"])
+sc.pl.umap(adata_filtered, color=["leiden"], size=7)
 ```
 
-![alt text](image-7.png)
+![alt text](image-5.png)
 
 - Cells with the same color are grouped together, indicating that they share similar gene expression patterns.
 - Different colored clusters often represent different cell types (e.g., T cells, B cells, monocytes).
 
 3. Try different `resolution` values.
 
-![alt text](image-3.png)
+![alt text](image-7.png)
 
 - Higher resolution -> More clusters (smaller groups)
 - Lower resolution -> Fewer clusters (larger groups).
@@ -233,13 +250,13 @@ sc.pl.umap(adata, color=["leiden"])
 4. Re-assess quality control
 
 **Detect Doublets**
-![alt text](image-6.png)
+![alt text](image-3.png)
 
 - Middle Plot: All dots are blue (False), meaning no obvious doublets were detected.
 - Right Plot: Shows the doublet score for each cell, where brighter (yellow) colors indicate a higher probability of being a doublet.
 
 **QC**
-![alt text](image-8.png)
+![alt text](image-6.png)
 
 - `log1p_total_counts`: reflects total counts (total sequencing depth) per cell.
   - If some cells have very low total counts, they may be low-quality cells and should be filtered out.
@@ -258,7 +275,7 @@ sc.tl.rank_genes_groups(adata, groupby="leiden", method="wilcoxon")
 sc.pl.rank_genes_groups(adata, n_genes=5, sharey=False) # Top 5
 ```
 
-![alt text](image-9.png)
+![alt text](image-8.png)
 
 - Each subplot represents a one-vs-rest comparison between a specific cell cluster and all other clusters.
 - X-axis: Represents the `ranking` of genes based on their importance in defining the cluster.
@@ -271,7 +288,7 @@ sc.pl.rank_genes_groups(adata, n_genes=5, sharey=False) # Top 5
 
 We can define a set of marker genes for the main cell types that we expect to see in this dataset. Then we can label our coarsest clustering with broad lineages.
 
-![alt text](image-10.png)
+![alt text](image-9.png)
 
 #### 7.3 Differentially-expressed Genes as Markers
 
@@ -279,10 +296,10 @@ We can also calculate marker genes per cluster and then look up whether we can l
 
 Visualize the top 5 differentially-expressed genes on a dotplot.
 
-![alt text](image-11.png)
+![alt text](image-10.png)
 
 We can then choose the cell types we are interested in and create our own plot by extracting the differentially expressed genes for different clusters.
 
-![alt text](image-12.png)
+![alt text](image-11.png)
 
 - This is the top 5 marker gene for cluster 6. 

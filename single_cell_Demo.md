@@ -14,9 +14,9 @@ This repository is a beginner-friendly demonstration of a **Single Cell Integrat
 
 ### 1. Load the Data
 
-PBMC 3k (peripheral blood mononuclear cell) is a a small-scale dataset (2700 cells) from 10X Genomics.
+PBMC 3k (peripheral blood mononuclear cell) is a small-scale dataset (2700 cells) from 10X Genomics.
 
-Single-ceel data is stored in **AnnData**, which inlcudes cells(obs), genes(var), and the Count matrix (X).
+Single-cell data is stored in **AnnData**, which includes cells(obs), genes(var), and the Count matrix (X).
 
 > `X` is the Count matrix, where rows correspond to cells (`n_obs`), and columns correspond to genes (`n_vars`). 
 
@@ -29,7 +29,7 @@ Single-ceel data is stored in **AnnData**, which inlcudes cells(obs), genes(var)
 
 ### 2. Quality Control
 
-Goal for quality control is to remove low-quality cells from the dataset. When a cell has a low number of detected genes, a low count depth and a high fraction of mitochondrial counts it might have a broken membrane which can indicate a dying cell.
+The goal for quality control is to remove low-quality cells from the dataset. A cell with a low number of detected genes, a low count depth, and a high fraction of mitochondrial counts might have a broken membrane, which can indicate a dying cell.
 
 #### 2.1. Identifying some important genes
 
@@ -38,12 +38,12 @@ During single-cell RNA-seq (scRNA-seq) quality control (QC), we usually check th
   - When a cell dies, its membrane may rupture, leading to RNA leakage. However, mitochondrial RNA is more stable and less prone to degradation, so scRNA-seq results for dead cells often show an abnormally high proportion of MT-gene expression.
 
 ```bash
-adata.var["mt"] = adata.var_names.str.startswith("MT-")
+adata.var["mt"] = adata.var_names.str.starts with("MT-")
 ```
 
 When cells die or respond to stress, the proportion of mitochondrial gene expression increases.
 
-> Usually we will also check Ribosomal genes (ribo) and Hemoglobin genes (hb). It is not necessay for this dataset.
+> Usually, we will also check Ribosomal genes (ribo) and Hemoglobin genes (hb). It is not necessary for this dataset.
 
 #### 2.2. Calculate QC metrics
 
@@ -90,7 +90,7 @@ sc.pl.violin(
 
 #### 2.4 Detection and Remove Doublet
 
-Doublets are defined as two cells that are sequenced under the same cellular barcode, for example, if they were captured in the same droplet. 
+Doublets are defined as two cells sequenced under the same cellular barcode, for example, if they were captured in the same droplet. 
 
 A doublet is called homotypic if it is formed by the same cell type (but from different individuals) and heterotypic otherwise. It is important to identify the heterotypic because they are most likely misclassified and can lead to error downstream analysis.
 
@@ -103,7 +103,7 @@ In `scrublet` doublet detection, `doublet_score` represents the probability that
 
 If `doublet_score > 0.2`, the cell is likely a doublet.
 
-Once we got thoes plots and doublet_score, we can determine appropriate filtering thresholds.
+We can determine appropriate filtering thresholds once we get those plots and doublet_score.
 
 - `total_counts`:
   - Low total UMI counts may indicate low-quality cells, while very high counts suggest doublets.
@@ -122,8 +122,8 @@ Once we got thoes plots and doublet_score, we can determine appropriate filterin
 #### Normalization
 - Adjusts gene expression levels (counts) across cells to make them comparable.
 - It can avoid technical noise and ensures consistent sequencing depth across different cells.
-- I using the defalut scanpy method `noralize_total`, which is total counts Scaling.
-  - Normalize the total UMI counts for each cell to acommon target value (default target_sum = 1e4).
+- I am using the default scanty method `noralize_total,` which is total counts Scaling.
+  - Normalize the total UMI counts for each cell to a common target value (default target_sum = 1e4).
 - Does not change the data distribution
 
 #### Log Transformation (Log1p): 
@@ -143,7 +143,7 @@ sc.pp.log1p(adata_filtered)
   - Some cells have much higher RNA counts than others.
 - Middle plot (After normalization):
   - Data points have formed several peaks instead of a continuous distribution.
-  - Since all cells' total_counts are scaled to 10,000, the original data's continuity is disrupted. If some cells had similar total_counts before normalization, they end up converging to similar values after normalization, forming artificial peaks.
+  - Since all cells' total_counts are scaled to 10,000, the original data's continuity is disrupted. If some cells had similar total_counts before normalization, they converge to similar values after normalization, forming artificial peaks.
 - Right plot (After log transformation):
   - The distribution is more symmetrical and close to the normal distribution.
   - Reduce outliers.
@@ -176,7 +176,7 @@ Linear dimensionality reduction.
 
 PCA identifies the principal components(PCs) of the data and projects high-dimensional data into a lower-dimensional space.
 
-PCA creates a new set of uncorrelated variables, so called principal components (PCs), via an orthogonal transformation of the original dataset. The PCs are linear combinations of features in the original dataset and are ranked with decreasing order of variance to define the transformation. Through the ranking usually the first PC amounts to the largest possible variance. PCs with the lowest variance are discarded to effectively reduce the dimensionality of the data without losing information.
+PCA creates a new set of uncorrelated variables, so-called principal components (PCs), via an orthogonal transformation of the original dataset. The PCs are linear combinations of features in the original dataset and are ranked in decreasing order of variance to define the transformation. Through the ranking usually the first PC amounts to the largest possible variance. PCs with the lowest variance are discarded to effectively reduce the dimensionality of the data without losing information.
 
 Usually, 10-50 PCs are selected since the first few PCs explain most of the variance.
 
@@ -196,7 +196,7 @@ sc.pl.pca_variance_ratio(adata_filtered, log=True)
 
 Nonlinear dimensionality reduction for visualization.
 
-We can compute `Neighborhood` and visulize using UMAP.
+We can compute `Neighborhood` and visualize it using UMAP.
 
 ```bash
 sc.pp.neighbors(adata_filtered, n_pcs=15)
@@ -262,8 +262,8 @@ sc.pl.umap(adata_filtered, color=["leiden"], size=7)
   - If some cells have very low total counts, they may be low-quality cells and should be filtered out.
 - `pct_counts_mt`: shows the percentage of MT gene.
   - A high mitochondrial percentage may indicate cells under stress or dying cells.
-- `log1p_n_genes_by_counts`: shows number of detected genes per cell after log1p-transformed,  used to assess gene expression.
-  - A low genes count -> might be low-quality celss or low-expression cell types.
+- `log1p_n_genes_by_counts`: shows the number of detected genes per cell after log1p-transformed,  used to assess gene expression.
+  - A low genes count -> might be low-quality cells or low-expression cell types.
 
 
 ### 7. Marker Gene and Annotation
@@ -282,7 +282,6 @@ sc.pl.rank_genes_groups(adata, n_genes=5, sharey=False) # Top 5
 - Y-axis: the marker `score`, which could be log-fold change (LFC), AUROC score, or Z-score.
 - Gene names are displayed to indicate their significance in the given cluster and each cluster may represent a different cell type.
   - For example: `NKG7`、`GNLY`、 are the marker genes in cluster 6. Which means cluster 6 might be `NK Cells`.
-- Some Clusters Lack Clear Markers, for example cluster 8 has low score compare to others. Which means those cell might be low-quality cells or doublets.
 
 #### 7.2 Create Marker Gene Dictionary
 
@@ -294,7 +293,7 @@ We can define a set of marker genes for the main cell types that we expect to se
 
 We can also calculate marker genes per cluster and then look up whether we can link those marker genes to any known biology.
 
-Visualize the top 5 differentially-expressed genes on a dotplot.
+Visualize the top 5 differentially expressed genes on a dot plot.
 
 ![alt text](image-10.png)
 
